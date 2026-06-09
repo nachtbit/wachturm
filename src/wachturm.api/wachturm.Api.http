@@ -1,6 +1,0 @@
-@wachturm.Api_HostAddress = http://localhost:5057
-
-GET {{wachturm.Api_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
