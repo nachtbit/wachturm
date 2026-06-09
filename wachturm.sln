@@ -9,6 +9,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "wachturm.Api", "src\wachtur
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "wachturm.Worker", "src\wachturm.worker\wachturm.Worker.csproj", "{BCD2326C-AB37-4B07-9F88-B70EC463544D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "wachturm.Domain", "src\wachturm.domain\wachturm.Domain.csproj", "{CE93B90F-F119-4F3F-AE1E-306E3B096DB1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "wachturm.Application", "src\wachturm.application\wachturm.Application.csproj", "{49AAA10A-0D6C-4434-807D-21AD1A89EC88}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "wachturm.Infrastructure", "src\wachturm.infrastructure\wachturm.Infrastructure.csproj", "{44C43F7F-1A2D-4A95-9FF9-3BAC5F131213}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,9 +32,24 @@ Global
 		{BCD2326C-AB37-4B07-9F88-B70EC463544D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BCD2326C-AB37-4B07-9F88-B70EC463544D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BCD2326C-AB37-4B07-9F88-B70EC463544D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE93B90F-F119-4F3F-AE1E-306E3B096DB1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE93B90F-F119-4F3F-AE1E-306E3B096DB1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE93B90F-F119-4F3F-AE1E-306E3B096DB1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE93B90F-F119-4F3F-AE1E-306E3B096DB1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{49AAA10A-0D6C-4434-807D-21AD1A89EC88}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{49AAA10A-0D6C-4434-807D-21AD1A89EC88}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{49AAA10A-0D6C-4434-807D-21AD1A89EC88}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{49AAA10A-0D6C-4434-807D-21AD1A89EC88}.Release|Any CPU.Build.0 = Release|Any CPU
+		{44C43F7F-1A2D-4A95-9FF9-3BAC5F131213}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{44C43F7F-1A2D-4A95-9FF9-3BAC5F131213}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{44C43F7F-1A2D-4A95-9FF9-3BAC5F131213}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{44C43F7F-1A2D-4A95-9FF9-3BAC5F131213}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{A0DD7FB6-0005-466F-BA66-F7436B5DD8FE} = {6A6F5200-8478-4CEB-BD20-72BDAAB7B25C}
 		{BCD2326C-AB37-4B07-9F88-B70EC463544D} = {6A6F5200-8478-4CEB-BD20-72BDAAB7B25C}
+		{CE93B90F-F119-4F3F-AE1E-306E3B096DB1} = {6A6F5200-8478-4CEB-BD20-72BDAAB7B25C}
+		{49AAA10A-0D6C-4434-807D-21AD1A89EC88} = {6A6F5200-8478-4CEB-BD20-72BDAAB7B25C}
+		{44C43F7F-1A2D-4A95-9FF9-3BAC5F131213} = {6A6F5200-8478-4CEB-BD20-72BDAAB7B25C}
 	EndGlobalSection
 EndGlobal
