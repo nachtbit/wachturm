@@ -27,12 +27,7 @@ public sealed class EndpointsController : ControllerBase
         var result = await _createEndpointHandler.HandleAsync(request, cancellationToken);
 
         if (result.IsFailure)
-        {
-            return BadRequest(new
-            {
-                error = result.Error
-            });
-        }
+            return BadRequest(new { error = result.Error });
 
         return CreatedAtAction(
             nameof(CreateEndpoint),
@@ -55,13 +50,57 @@ public sealed class EndpointsController : ControllerBase
         var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
 
         if (endpoint is null)
-        {
-            return NotFound(new
-            {
-                error = "Endpoint not found."
-            });
-        }
+            return NotFound(new { error = "Endpoint not found." });
         
         return Ok(endpoint);
+    }
+    
+    [HttpPatch("{id:guid}/activate")]
+    public async Task<IActionResult> ActivateEndpoint(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
+
+        if (endpoint is null)
+            return NotFound(new { error = "Endpoint not found." });
+
+        endpoint.IsActive = true;
+
+        await _endpointRepository.UpdateAsync(endpoint, cancellationToken);
+
+        return Ok(endpoint);
+    }
+
+    [HttpPatch("{id:guid}/deactivate")]
+    public async Task<IActionResult> DeactivateEndpoint(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
+
+        if (endpoint is null)
+            return NotFound(new { error = "Endpoint not found." });
+
+        endpoint.IsActive = false;
+
+        await _endpointRepository.UpdateAsync(endpoint, cancellationToken);
+
+        return Ok(endpoint);
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteEndpoint(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
+
+        if (endpoint is null)
+            return NotFound(new { error = "Endpoint not found." });
+
+        await _endpointRepository.DeleteAsync(endpoint, cancellationToken);
+
+        return NoContent();
     }
 }

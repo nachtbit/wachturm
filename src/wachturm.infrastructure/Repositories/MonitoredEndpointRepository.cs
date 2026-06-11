@@ -32,4 +32,16 @@ public class MonitoredEndpointRepository : IMonitoredEndpointRepository
         return await _dbContext.MonitoredEndpoints
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
+    
+    public async Task UpdateAsync(MonitoredEndpoint endpoint, CancellationToken cancellationToken = default)
+    {
+        _dbContext.MonitoredEndpoints.Update(endpoint);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteAsync(MonitoredEndpoint endpoint, CancellationToken cancellationToken = default)
+    {
+        _dbContext.MonitoredEndpoints.Remove(endpoint);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

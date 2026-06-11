@@ -7,4 +7,6 @@ public interface IMonitoredEndpointRepository
     Task AddAsync(MonitoredEndpoint endpoint, CancellationToken cancellationToken = default);
     Task<List<MonitoredEndpoint>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<MonitoredEndpoint?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task UpdateAsync(MonitoredEndpoint endpoint, CancellationToken cancellationToken = default);
+    Task DeleteAsync(MonitoredEndpoint endpoint, CancellationToken cancellationToken = default);
 }
