@@ -29,6 +29,9 @@ public sealed class CreateEndpointHandler
 
         if (request.IntervalSeconds < 5)
             return Result<MonitoredEndpoint>.Failure("Interval must be at least 5 seconds.");
+        
+        if (request.TimeoutThresholdMs < 100)
+            return Result<MonitoredEndpoint>.Failure("Timeout threshold must be at least 100 ms.");
 
         var endpoint = new MonitoredEndpoint
         {
@@ -36,6 +39,7 @@ public sealed class CreateEndpointHandler
             Url = request.Url.Trim(),
             Method = request.Method.Trim().ToUpperInvariant(),
             IntervalSeconds = request.IntervalSeconds,
+            TimeoutThresholdMs = request.TimeoutThresholdMs,
             IsActive = true
         };
 

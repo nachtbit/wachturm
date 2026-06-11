@@ -85,6 +85,8 @@ public class Worker : BackgroundService
 
             await resultRepository.AddAsync(result, cancellationToken);
 
+            DetectLatencyWarning(endpoint, result);
+
             await DetectAlertAsync(endpoint, resultRepository, cancellationToken);
 
             _logger.LogInformation(
@@ -121,6 +123,23 @@ public class Worker : BackgroundService
 
             await MarkEndpointAsCheckedAsync(endpoint, endpointRepository, cancellationToken);
         }
+    }
+
+    private void DetectLatencyWarning(
+        MonitoredEndpoint endpoint,
+        CheckResult result)
+    {
+        if (result.ResponseTimeMs <= endpoint.TimeoutThresholdMs)
+        {
+            return;
+        }
+
+        _logger.LogWarning(
+            "WARNING: Endpoint {EndpointId} {Url} exceeded latency threshold. Response time: {ResponseTimeMs}ms. Threshold: {ThresholdMs}ms",
+            endpoint.Id,
+            endpoint.Url,
+            result.ResponseTimeMs,
+            endpoint.TimeoutThresholdMs);
     }
 
     private static async Task MarkEndpointAsCheckedAsync(

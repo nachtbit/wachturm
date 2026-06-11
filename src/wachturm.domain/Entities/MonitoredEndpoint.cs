@@ -10,4 +10,5 @@ public class MonitoredEndpoint : BaseEntity
     public int IntervalSeconds { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime? LastCheckedAtUtc { get; set; }
+    public int TimeoutThresholdMs { get; set; } = 3000;
 }
