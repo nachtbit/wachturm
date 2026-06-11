@@ -85,6 +85,8 @@ public class Worker : BackgroundService
 
             await resultRepository.AddAsync(result, cancellationToken);
 
+            await DetectAlertAsync(endpoint, resultRepository, cancellationToken);
+
             _logger.LogInformation(
                 "Checked endpoint {EndpointId} {Url}. Status: {StatusCode}. Response time: {ResponseTimeMs}ms",
                 endpoint.Id,
@@ -109,6 +111,8 @@ public class Worker : BackgroundService
 
             await resultRepository.AddAsync(result, cancellationToken);
 
+            await DetectAlertAsync(endpoint, resultRepository, cancellationToken);
+
             _logger.LogError(
                 ex,
                 "Failed to check endpoint {EndpointId} {Url}",
@@ -118,7 +122,7 @@ public class Worker : BackgroundService
             await MarkEndpointAsCheckedAsync(endpoint, endpointRepository, cancellationToken);
         }
     }
-    
+
     private static async Task MarkEndpointAsCheckedAsync(
         MonitoredEndpoint endpoint,
         IMonitoredEndpointRepository endpointRepository,
@@ -127,5 +131,31 @@ public class Worker : BackgroundService
         endpoint.LastCheckedAtUtc = DateTime.UtcNow;
 
         await endpointRepository.UpdateAsync(endpoint, cancellationToken);
+    }
+
+    private async Task DetectAlertAsync(
+        MonitoredEndpoint endpoint,
+        ICheckResultRepository resultRepository,
+        CancellationToken cancellationToken)
+    {
+        var latestResults = await resultRepository.GetLatestByEndpointIdAsync(
+            endpoint.Id,
+            3,
+            cancellationToken);
+
+        if (latestResults.Count < 3)
+        {
+            return;
+        }
+
+        var allFailed = latestResults.All(x => !x.IsSuccess);
+
+        if (allFailed)
+        {
+            _logger.LogWarning(
+                "ALERT: Endpoint {EndpointId} {Url} failed 3 consecutive checks.",
+                endpoint.Id,
+                endpoint.Url);
+        }
     }
 }

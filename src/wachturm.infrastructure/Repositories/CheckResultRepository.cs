@@ -28,4 +28,17 @@ public class CheckResultRepository : ICheckResultRepository
             .OrderByDescending(x => x.CheckedAtUtc)
             .ToListAsync(cancellationToken);
     }
+    
+    public async Task<List<CheckResult>> GetLatestByEndpointIdAsync(
+        Guid endpointId,
+        int count,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.CheckResults
+            .AsNoTracking()
+            .Where(x => x.EndpointId == endpointId)
+            .OrderByDescending(x => x.CheckedAtUtc)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+    }
 }
