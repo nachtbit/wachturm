@@ -164,4 +164,46 @@ public sealed class EndpointsController : ControllerBase
             FailedChecks = failedChecks
         });
     }
+    
+    [HttpGet("{id:guid}/latest")]
+    public async Task<IActionResult> GetLatestResult(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
+
+        if (endpoint is null)
+            return NotFound(new { error = "Endpoint not found." });
+
+        var latestResult = await _checkResultRepository.GetLatestByEndpointIdAsync(
+            id,
+            cancellationToken);
+
+        if (latestResult is null)
+            return NotFound(new { error = "No check results found for this endpoint." });
+
+        return Ok(latestResult);
+    }
+
+    [HttpGet("{id:guid}/history")]
+    public async Task<IActionResult> GetEndpointHistory(
+        Guid id,
+        [FromQuery] int take = 100,
+        CancellationToken cancellationToken = default)
+    {
+        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
+
+        if (endpoint is null)
+            return NotFound(new { error = "Endpoint not found." });
+
+        if (take is < 1 or > 1000)
+            return BadRequest(new { error = "Take must be between 1 and 1000." });
+
+        var history = await _checkResultRepository.GetHistoryByEndpointIdAsync(
+            id,
+            take,
+            cancellationToken);
+
+        return Ok(history);
+    }
 }

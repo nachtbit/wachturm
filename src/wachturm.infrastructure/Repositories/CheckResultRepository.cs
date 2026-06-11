@@ -41,4 +41,28 @@ public class CheckResultRepository : ICheckResultRepository
             .Take(count)
             .ToListAsync(cancellationToken);
     }
+    
+    public async Task<CheckResult?> GetLatestByEndpointIdAsync(
+        Guid endpointId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.CheckResults
+            .AsNoTracking()
+            .Where(x => x.EndpointId == endpointId)
+            .OrderByDescending(x => x.CheckedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<List<CheckResult>> GetHistoryByEndpointIdAsync(
+        Guid endpointId,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.CheckResults
+            .AsNoTracking()
+            .Where(x => x.EndpointId == endpointId)
+            .OrderByDescending(x => x.CheckedAtUtc)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+    }
 }
