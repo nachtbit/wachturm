@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using wachturm.Application.Abstractions;
 using wachturm.Application.Endpoints.CreateEndpoint;
+using wachturm.Application.Endpoints.GetEndpointStatus;
 
 namespace wachturm.Api.Controllers;
 
@@ -10,13 +11,16 @@ public sealed class EndpointsController : ControllerBase
 {
     private readonly CreateEndpointHandler _createEndpointHandler;
     private readonly IMonitoredEndpointRepository _endpointRepository;
+    private readonly ICheckResultRepository _checkResultRepository;
 
     public EndpointsController(
         CreateEndpointHandler createEndpointHandler,
-        IMonitoredEndpointRepository endpointRepository)
+        IMonitoredEndpointRepository endpointRepository,
+        ICheckResultRepository checkResultRepository)
     {
         _createEndpointHandler = createEndpointHandler;
         _endpointRepository = endpointRepository;
+        _checkResultRepository = checkResultRepository;
     }
 
     [HttpPost]
@@ -102,5 +106,62 @@ public sealed class EndpointsController : ControllerBase
         await _endpointRepository.DeleteAsync(endpoint, cancellationToken);
 
         return NoContent();
+    }
+    
+    [HttpGet("{id:guid}/results")]
+    public async Task<IActionResult> GetEndpointResults(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
+
+        if (endpoint is null)
+            return NotFound(new { error = "Endpoint not found." });
+
+        var results = await _checkResultRepository.GetByEndpointIdAsync(id, cancellationToken);
+
+        return Ok(results);
+    }
+    
+    [HttpGet("{id:guid}/status")]
+    public async Task<IActionResult> GetEndpointStatus(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
+
+        if (endpoint is null)
+            return NotFound(new { error = "Endpoint not found." });
+
+        var results = await _checkResultRepository.GetByEndpointIdAsync(id, cancellationToken);
+
+        if (results.Count == 0)
+        {
+            return Ok(new GetEndpointStatusResponse
+            {
+                EndpointId = id,
+                IsHealthy = false,
+                UptimePercentage = 0,
+                AverageResponseTimeMs = 0,
+                TotalChecks = 0,
+                FailedChecks = 0
+            });
+        }
+
+        var lastResult = results[0];
+        var successfulChecks = results.Count(x => x.IsSuccess);
+        var failedChecks = results.Count - successfulChecks;
+
+        return Ok(new GetEndpointStatusResponse
+        {
+            EndpointId = id,
+            IsHealthy = lastResult.IsSuccess,
+            LastStatusCode = lastResult.StatusCode,
+            LastResponseTimeMs = lastResult.ResponseTimeMs,
+            UptimePercentage = Math.Round((double)successfulChecks / results.Count * 100, 2),
+            AverageResponseTimeMs = Math.Round(results.Average(x => x.ResponseTimeMs), 2),
+            TotalChecks = results.Count,
+            FailedChecks = failedChecks
+        });
     }
 }
