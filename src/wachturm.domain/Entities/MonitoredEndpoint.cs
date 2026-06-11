@@ -9,4 +9,5 @@ public class MonitoredEndpoint : BaseEntity
     public string Method { get; set; } = "GET";
     public int IntervalSeconds { get; set; }
     public bool IsActive { get; set; } = true;
+    public DateTime? LastCheckedAtUtc { get; set; }
 }

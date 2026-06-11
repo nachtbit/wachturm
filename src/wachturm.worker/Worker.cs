@@ -38,7 +38,16 @@ public class Worker : BackgroundService
 
             foreach (var endpoint in endpoints)
             {
-                await CheckEndpointAsync(endpoint, resultRepository, stoppingToken);
+                var shouldCheck =
+                    endpoint.LastCheckedAtUtc is null ||
+                    endpoint.LastCheckedAtUtc.Value.AddSeconds(endpoint.IntervalSeconds) <= DateTime.UtcNow;
+
+                if (!shouldCheck)
+                {
+                    continue;
+                }
+
+                await CheckEndpointAsync(endpoint, endpointRepository, resultRepository, stoppingToken);
             }
 
             await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
@@ -47,6 +56,7 @@ public class Worker : BackgroundService
 
     private async Task CheckEndpointAsync(
         MonitoredEndpoint endpoint,
+        IMonitoredEndpointRepository endpointRepository,
         ICheckResultRepository resultRepository,
         CancellationToken cancellationToken)
     {
@@ -81,6 +91,8 @@ public class Worker : BackgroundService
                 endpoint.Url,
                 result.StatusCode,
                 result.ResponseTimeMs);
+
+            await MarkEndpointAsCheckedAsync(endpoint, endpointRepository, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -102,6 +114,18 @@ public class Worker : BackgroundService
                 "Failed to check endpoint {EndpointId} {Url}",
                 endpoint.Id,
                 endpoint.Url);
+
+            await MarkEndpointAsCheckedAsync(endpoint, endpointRepository, cancellationToken);
         }
+    }
+    
+    private static async Task MarkEndpointAsCheckedAsync(
+        MonitoredEndpoint endpoint,
+        IMonitoredEndpointRepository endpointRepository,
+        CancellationToken cancellationToken)
+    {
+        endpoint.LastCheckedAtUtc = DateTime.UtcNow;
+
+        await endpointRepository.UpdateAsync(endpoint, cancellationToken);
     }
 }
