@@ -1,23 +1,107 @@
+using System.Diagnostics;
+using wachturm.Application.Abstractions;
+using wachturm.Domain.Entities;
+
 namespace wachturm.Worker;
 
 public class Worker : BackgroundService
 {
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<Worker> _logger;
 
-    public Worker(ILogger<Worker> logger)
+    public Worker(
+        IServiceScopeFactory scopeFactory,
+        IHttpClientFactory httpClientFactory,
+        ILogger<Worker> logger)
     {
+        _scopeFactory = scopeFactory;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _logger.LogInformation("Wachturm worker started.");
+
         while (!stoppingToken.IsCancellationRequested)
         {
-            if (_logger.IsEnabled(LogLevel.Information))
+            using var scope = _scopeFactory.CreateScope();
+
+            var endpointRepository =
+                scope.ServiceProvider.GetRequiredService<IMonitoredEndpointRepository>();
+
+            var resultRepository =
+                scope.ServiceProvider.GetRequiredService<ICheckResultRepository>();
+
+            var endpoints = await endpointRepository.GetActiveAsync(stoppingToken);
+
+            foreach (var endpoint in endpoints)
             {
-                _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                await CheckEndpointAsync(endpoint, resultRepository, stoppingToken);
             }
-            await Task.Delay(1000, stoppingToken);
+
+            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+        }
+    }
+
+    private async Task CheckEndpointAsync(
+        MonitoredEndpoint endpoint,
+        ICheckResultRepository resultRepository,
+        CancellationToken cancellationToken)
+    {
+        var client = _httpClientFactory.CreateClient();
+
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            using var request = new HttpRequestMessage(
+                new HttpMethod(endpoint.Method),
+                endpoint.Url);
+
+            using var response = await client.SendAsync(request, cancellationToken);
+
+            stopwatch.Stop();
+
+            var result = new CheckResult
+            {
+                EndpointId = endpoint.Id,
+                StatusCode = (int)response.StatusCode,
+                ResponseTimeMs = stopwatch.ElapsedMilliseconds,
+                IsSuccess = response.IsSuccessStatusCode,
+                CheckedAtUtc = DateTime.UtcNow
+            };
+
+            await resultRepository.AddAsync(result, cancellationToken);
+
+            _logger.LogInformation(
+                "Checked endpoint {EndpointId} {Url}. Status: {StatusCode}. Response time: {ResponseTimeMs}ms",
+                endpoint.Id,
+                endpoint.Url,
+                result.StatusCode,
+                result.ResponseTimeMs);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+
+            var result = new CheckResult
+            {
+                EndpointId = endpoint.Id,
+                StatusCode = 0,
+                ResponseTimeMs = stopwatch.ElapsedMilliseconds,
+                IsSuccess = false,
+                CheckedAtUtc = DateTime.UtcNow
+            };
+
+            await resultRepository.AddAsync(result, cancellationToken);
+
+            _logger.LogError(
+                ex,
+                "Failed to check endpoint {EndpointId} {Url}",
+                endpoint.Id,
+                endpoint.Url);
         }
     }
 }

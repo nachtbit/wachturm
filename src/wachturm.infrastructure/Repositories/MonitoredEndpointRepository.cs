@@ -44,4 +44,12 @@ public class MonitoredEndpointRepository : IMonitoredEndpointRepository
         _dbContext.MonitoredEndpoints.Remove(endpoint);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
+    
+    public async Task<List<MonitoredEndpoint>> GetActiveAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.MonitoredEndpoints
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .ToListAsync(cancellationToken);
+    }
 }
