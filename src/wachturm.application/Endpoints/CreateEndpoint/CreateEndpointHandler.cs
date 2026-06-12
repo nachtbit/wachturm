@@ -1,5 +1,6 @@
 using wachturm.Application.Abstractions;
 using wachturm.Application.Common;
+using wachturm.Application.Endpoints;
 using wachturm.Domain.Entities;
 
 namespace wachturm.Application.Endpoints.CreateEndpoint;
@@ -13,25 +14,19 @@ public sealed class CreateEndpointHandler
         _repository = repository;
     }
 
-    public async Task<Result<MonitoredEndpoint>> HandleAsync(
+    public async Task<Result<EndpointResponse>> HandleAsync(
         CreateEndpointRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-            return Result<MonitoredEndpoint>.Failure("Endpoint name is required.");
+        var validationResult = EndpointValidation.Validate(
+            request.Name,
+            request.Url,
+            request.Method,
+            request.IntervalSeconds,
+            request.TimeoutThresholdMs);
 
-        if (string.IsNullOrWhiteSpace(request.Url))
-            return Result<MonitoredEndpoint>.Failure("Endpoint URL is required.");
-
-        if (!Uri.TryCreate(request.Url, UriKind.Absolute, out var uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-            return Result<MonitoredEndpoint>.Failure("Endpoint URL must be a valid HTTP or HTTPS URL.");
-
-        if (request.IntervalSeconds < 5)
-            return Result<MonitoredEndpoint>.Failure("Interval must be at least 5 seconds.");
-        
-        if (request.TimeoutThresholdMs < 100)
-            return Result<MonitoredEndpoint>.Failure("Timeout threshold must be at least 100 ms.");
+        if (validationResult.IsFailure)
+            return Result<EndpointResponse>.Failure(validationResult.Error!);
 
         var endpoint = new MonitoredEndpoint
         {
@@ -45,6 +40,6 @@ public sealed class CreateEndpointHandler
 
         await _repository.AddAsync(endpoint, cancellationToken);
 
-        return Result<MonitoredEndpoint>.Success(endpoint);
+        return Result<EndpointResponse>.Success(EndpointResponse.FromEntity(endpoint));
     }
 }

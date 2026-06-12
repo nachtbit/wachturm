@@ -1,7 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
-using wachturm.Application.Abstractions;
+using wachturm.Application.Common;
+using wachturm.Application.Endpoints.ActivateEndpoint;
 using wachturm.Application.Endpoints.CreateEndpoint;
+using wachturm.Application.Endpoints.DeactivateEndpoint;
+using wachturm.Application.Endpoints.DeleteEndpoint;
+using wachturm.Application.Endpoints.GetEndpointById;
+using wachturm.Application.Endpoints.GetEndpointHistory;
+using wachturm.Application.Endpoints.GetEndpoints;
 using wachturm.Application.Endpoints.GetEndpointStatus;
+using wachturm.Application.Endpoints.GetLatestCheckResult;
 
 namespace wachturm.Api.Controllers;
 
@@ -10,17 +17,35 @@ namespace wachturm.Api.Controllers;
 public sealed class EndpointsController : ControllerBase
 {
     private readonly CreateEndpointHandler _createEndpointHandler;
-    private readonly IMonitoredEndpointRepository _endpointRepository;
-    private readonly ICheckResultRepository _checkResultRepository;
+    private readonly GetEndpointsHandler _getEndpointsHandler;
+    private readonly GetEndpointByIdHandler _getEndpointByIdHandler;
+    private readonly ActivateEndpointHandler _activateEndpointHandler;
+    private readonly DeactivateEndpointHandler _deactivateEndpointHandler;
+    private readonly DeleteEndpointHandler _deleteEndpointHandler;
+    private readonly GetEndpointStatusHandler _getEndpointStatusHandler;
+    private readonly GetEndpointHistoryHandler _getEndpointHistoryHandler;
+    private readonly GetLatestCheckResultHandler _getLatestCheckResultHandler;
 
     public EndpointsController(
         CreateEndpointHandler createEndpointHandler,
-        IMonitoredEndpointRepository endpointRepository,
-        ICheckResultRepository checkResultRepository)
+        GetEndpointsHandler getEndpointsHandler,
+        GetEndpointByIdHandler getEndpointByIdHandler,
+        ActivateEndpointHandler activateEndpointHandler,
+        DeactivateEndpointHandler deactivateEndpointHandler,
+        DeleteEndpointHandler deleteEndpointHandler,
+        GetEndpointStatusHandler getEndpointStatusHandler,
+        GetEndpointHistoryHandler getEndpointHistoryHandler,
+        GetLatestCheckResultHandler getLatestCheckResultHandler)
     {
         _createEndpointHandler = createEndpointHandler;
-        _endpointRepository = endpointRepository;
-        _checkResultRepository = checkResultRepository;
+        _getEndpointsHandler = getEndpointsHandler;
+        _getEndpointByIdHandler = getEndpointByIdHandler;
+        _activateEndpointHandler = activateEndpointHandler;
+        _deactivateEndpointHandler = deactivateEndpointHandler;
+        _deleteEndpointHandler = deleteEndpointHandler;
+        _getEndpointStatusHandler = getEndpointStatusHandler;
+        _getEndpointHistoryHandler = getEndpointHistoryHandler;
+        _getLatestCheckResultHandler = getLatestCheckResultHandler;
     }
 
     [HttpPost]
@@ -31,10 +56,10 @@ public sealed class EndpointsController : ControllerBase
         var result = await _createEndpointHandler.HandleAsync(request, cancellationToken);
 
         if (result.IsFailure)
-            return BadRequest(new { error = result.Error });
+            return ToErrorResponse(result);
 
         return CreatedAtAction(
-            nameof(CreateEndpoint),
+            nameof(GetEndpointById),
             new { id = result.Value!.Id },
             result.Value);
     }
@@ -42,21 +67,17 @@ public sealed class EndpointsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetEndpoints(CancellationToken cancellationToken)
     {
-        var endpoints = await _endpointRepository.GetAllAsync(cancellationToken);
+        var endpoints = await _getEndpointsHandler.HandleAsync(cancellationToken);
         return Ok(endpoints);
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetEndpointById(
         Guid id,
         CancellationToken cancellationToken)
     {
-        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
-
-        if (endpoint is null)
-            return NotFound(new { error = "Endpoint not found." });
-        
-        return Ok(endpoint);
+        var result = await _getEndpointByIdHandler.HandleAsync(id, cancellationToken);
+        return result.IsFailure ? ToErrorResponse(result) : Ok(result.Value);
     }
     
     [HttpPatch("{id:guid}/activate")]
@@ -64,16 +85,8 @@ public sealed class EndpointsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
-
-        if (endpoint is null)
-            return NotFound(new { error = "Endpoint not found." });
-
-        endpoint.IsActive = true;
-
-        await _endpointRepository.UpdateAsync(endpoint, cancellationToken);
-
-        return Ok(endpoint);
+        var result = await _activateEndpointHandler.HandleAsync(id, cancellationToken);
+        return result.IsFailure ? ToErrorResponse(result) : Ok(result.Value);
     }
 
     [HttpPatch("{id:guid}/deactivate")]
@@ -81,16 +94,8 @@ public sealed class EndpointsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
-
-        if (endpoint is null)
-            return NotFound(new { error = "Endpoint not found." });
-
-        endpoint.IsActive = false;
-
-        await _endpointRepository.UpdateAsync(endpoint, cancellationToken);
-
-        return Ok(endpoint);
+        var result = await _deactivateEndpointHandler.HandleAsync(id, cancellationToken);
+        return result.IsFailure ? ToErrorResponse(result) : Ok(result.Value);
     }
 
     [HttpDelete("{id:guid}")]
@@ -98,14 +103,8 @@ public sealed class EndpointsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
-
-        if (endpoint is null)
-            return NotFound(new { error = "Endpoint not found." });
-
-        await _endpointRepository.DeleteAsync(endpoint, cancellationToken);
-
-        return NoContent();
+        var result = await _deleteEndpointHandler.HandleAsync(id, cancellationToken);
+        return result.IsFailure ? ToErrorResponse(result) : NoContent();
     }
     
     [HttpGet("{id:guid}/results")]
@@ -113,14 +112,8 @@ public sealed class EndpointsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
-
-        if (endpoint is null)
-            return NotFound(new { error = "Endpoint not found." });
-
-        var results = await _checkResultRepository.GetByEndpointIdAsync(id, cancellationToken);
-
-        return Ok(results);
+        var result = await _getEndpointHistoryHandler.HandleAsync(id, 100, cancellationToken);
+        return result.IsFailure ? ToErrorResponse(result) : Ok(result.Value);
     }
     
     [HttpGet("{id:guid}/status")]
@@ -128,41 +121,8 @@ public sealed class EndpointsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
-
-        if (endpoint is null)
-            return NotFound(new { error = "Endpoint not found." });
-
-        var results = await _checkResultRepository.GetByEndpointIdAsync(id, cancellationToken);
-
-        if (results.Count == 0)
-        {
-            return Ok(new GetEndpointStatusResponse
-            {
-                EndpointId = id,
-                IsHealthy = false,
-                UptimePercentage = 0,
-                AverageResponseTimeMs = 0,
-                TotalChecks = 0,
-                FailedChecks = 0
-            });
-        }
-
-        var lastResult = results[0];
-        var successfulChecks = results.Count(x => x.IsSuccess);
-        var failedChecks = results.Count - successfulChecks;
-
-        return Ok(new GetEndpointStatusResponse
-        {
-            EndpointId = id,
-            IsHealthy = lastResult.IsSuccess,
-            LastStatusCode = lastResult.StatusCode,
-            LastResponseTimeMs = lastResult.ResponseTimeMs,
-            UptimePercentage = Math.Round((double)successfulChecks / results.Count * 100, 2),
-            AverageResponseTimeMs = Math.Round(results.Average(x => x.ResponseTimeMs), 2),
-            TotalChecks = results.Count,
-            FailedChecks = failedChecks
-        });
+        var result = await _getEndpointStatusHandler.HandleAsync(id, cancellationToken);
+        return result.IsFailure ? ToErrorResponse(result) : Ok(result.Value);
     }
     
     [HttpGet("{id:guid}/latest")]
@@ -170,19 +130,8 @@ public sealed class EndpointsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
-
-        if (endpoint is null)
-            return NotFound(new { error = "Endpoint not found." });
-
-        var latestResult = await _checkResultRepository.GetLatestByEndpointIdAsync(
-            id,
-            cancellationToken);
-
-        if (latestResult is null)
-            return NotFound(new { error = "No check results found for this endpoint." });
-
-        return Ok(latestResult);
+        var result = await _getLatestCheckResultHandler.HandleAsync(id, cancellationToken);
+        return result.IsFailure ? ToErrorResponse(result) : Ok(result.Value);
     }
 
     [HttpGet("{id:guid}/history")]
@@ -191,19 +140,18 @@ public sealed class EndpointsController : ControllerBase
         [FromQuery] int take = 100,
         CancellationToken cancellationToken = default)
     {
-        var endpoint = await _endpointRepository.GetByIdAsync(id, cancellationToken);
+        var result = await _getEndpointHistoryHandler.HandleAsync(id, take, cancellationToken);
+        return result.IsFailure ? ToErrorResponse(result) : Ok(result.Value);
+    }
 
-        if (endpoint is null)
-            return NotFound(new { error = "Endpoint not found." });
+    private IActionResult ToErrorResponse(Result result)
+    {
+        if (string.Equals(result.Error, "Endpoint not found.", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(result.Error, "No check results found for this endpoint.", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound(new { error = result.Error });
+        }
 
-        if (take is < 1 or > 1000)
-            return BadRequest(new { error = "Take must be between 1 and 1000." });
-
-        var history = await _checkResultRepository.GetHistoryByEndpointIdAsync(
-            id,
-            take,
-            cancellationToken);
-
-        return Ok(history);
+        return BadRequest(new { error = result.Error });
     }
 }

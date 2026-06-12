@@ -1,9 +1,19 @@
 using Scalar.AspNetCore;
+using Serilog;
 using wachturm.Application;
 using wachturm.Infrastructure;
 using wachturm.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("ServiceName", "wachturm.Api")
+        .WriteTo.Console();
+});
 
 builder.Services.AddControllers();
 
@@ -29,5 +39,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
 app.Run();

@@ -26,28 +26,54 @@ public class Worker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            using var scope = _scopeFactory.CreateScope();
-
-            var endpointRepository =
-                scope.ServiceProvider.GetRequiredService<IMonitoredEndpointRepository>();
-
-            var resultRepository =
-                scope.ServiceProvider.GetRequiredService<ICheckResultRepository>();
-
-            var endpoints = await endpointRepository.GetActiveAsync(stoppingToken);
-
-            foreach (var endpoint in endpoints)
+            try
             {
-                var shouldCheck =
-                    endpoint.LastCheckedAtUtc is null ||
-                    endpoint.LastCheckedAtUtc.Value.AddSeconds(endpoint.IntervalSeconds) <= DateTime.UtcNow;
+                using var scope = _scopeFactory.CreateScope();
 
-                if (!shouldCheck)
+                var endpointRepository =
+                    scope.ServiceProvider.GetRequiredService<IMonitoredEndpointRepository>();
+
+                var resultRepository =
+                    scope.ServiceProvider.GetRequiredService<ICheckResultRepository>();
+
+                var endpoints = await endpointRepository.GetActiveAsync(stoppingToken);
+
+                foreach (var endpoint in endpoints)
                 {
-                    continue;
-                }
+                    var shouldCheck =
+                        endpoint.LastCheckedAtUtc is null ||
+                        endpoint.LastCheckedAtUtc.Value.AddSeconds(endpoint.IntervalSeconds) <= DateTime.UtcNow;
 
-                await CheckEndpointAsync(endpoint, endpointRepository, resultRepository, stoppingToken);
+                    if (!shouldCheck)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        await CheckEndpointAsync(endpoint, endpointRepository, resultRepository, stoppingToken);
+                    }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(
+                            ex,
+                            "Endpoint check crashed for {EndpointId} {Url}. Other endpoints will continue.",
+                            endpoint.Id,
+                            endpoint.Url);
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Worker polling loop failed. The worker will retry.");
             }
 
             await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
@@ -61,8 +87,9 @@ public class Worker : BackgroundService
         CancellationToken cancellationToken)
     {
         var client = _httpClientFactory.CreateClient();
-
         var stopwatch = Stopwatch.StartNew();
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(endpoint.TimeoutThresholdMs));
 
         try
         {
@@ -70,7 +97,7 @@ public class Worker : BackgroundService
                 new HttpMethod(endpoint.Method),
                 endpoint.Url);
 
-            using var response = await client.SendAsync(request, cancellationToken);
+            using var response = await client.SendAsync(request, timeoutCts.Token);
 
             stopwatch.Stop();
 
@@ -90,11 +117,42 @@ public class Worker : BackgroundService
             await DetectAlertAsync(endpoint, resultRepository, cancellationToken);
 
             _logger.LogInformation(
-                "Checked endpoint {EndpointId} {Url}. Status: {StatusCode}. Response time: {ResponseTimeMs}ms",
+                "Checked endpoint {EndpointId} {Url}. StatusCode: {StatusCode}. ResponseTimeMs: {ResponseTimeMs}. IsSuccess: {IsSuccess}",
                 endpoint.Id,
                 endpoint.Url,
                 result.StatusCode,
-                result.ResponseTimeMs);
+                result.ResponseTimeMs,
+                result.IsSuccess);
+
+            await MarkEndpointAsCheckedAsync(endpoint, endpointRepository, cancellationToken);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            stopwatch.Stop();
+
+            var result = new CheckResult
+            {
+                EndpointId = endpoint.Id,
+                StatusCode = 0,
+                ResponseTimeMs = stopwatch.ElapsedMilliseconds,
+                IsSuccess = false,
+                CheckedAtUtc = DateTime.UtcNow
+            };
+
+            await resultRepository.AddAsync(result, cancellationToken);
+
+            DetectLatencyWarning(endpoint, result);
+
+            await DetectAlertAsync(endpoint, resultRepository, cancellationToken);
+
+            _logger.LogWarning(
+                ex,
+                "Endpoint check timed out for {EndpointId} {Url}. StatusCode: {StatusCode}. ResponseTimeMs: {ResponseTimeMs}. IsSuccess: {IsSuccess}",
+                endpoint.Id,
+                endpoint.Url,
+                result.StatusCode,
+                result.ResponseTimeMs,
+                result.IsSuccess);
 
             await MarkEndpointAsCheckedAsync(endpoint, endpointRepository, cancellationToken);
         }
@@ -117,9 +175,12 @@ public class Worker : BackgroundService
 
             _logger.LogError(
                 ex,
-                "Failed to check endpoint {EndpointId} {Url}",
+                "Failed to check endpoint {EndpointId} {Url}. StatusCode: {StatusCode}. ResponseTimeMs: {ResponseTimeMs}. IsSuccess: {IsSuccess}",
                 endpoint.Id,
-                endpoint.Url);
+                endpoint.Url,
+                result.StatusCode,
+                result.ResponseTimeMs,
+                result.IsSuccess);
 
             await MarkEndpointAsCheckedAsync(endpoint, endpointRepository, cancellationToken);
         }

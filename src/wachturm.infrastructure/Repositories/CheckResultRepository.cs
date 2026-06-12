@@ -20,6 +20,14 @@ public class CheckResultRepository : ICheckResultRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<List<CheckResult>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.CheckResults
+            .AsNoTracking()
+            .OrderByDescending(x => x.CheckedAtUtc)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<List<CheckResult>> GetByEndpointIdAsync(Guid endpointId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.CheckResults
